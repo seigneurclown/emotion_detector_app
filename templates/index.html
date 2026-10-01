@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Nhận diện Cảm xúc Khuôn mặt</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 20px;
+    }
+    .wrapper {
+      position: relative;
+      display: inline-block;
+      border: 3px solid #333;
+      border-radius: 8px;
+      overflow: hidden;
+      line-height: 0;
+    }
+    video {
+      display: block;
+      width: 640px;
+      height: 480px;
+    }
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 640px;
+      height: 480px;
+      pointer-events: none;
+    }
+    #status {
+      margin-top: 15px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #2c3e50;
+    }
+    #log {
+      margin-top: 8px;
+      font-size: 14px;
+      color: #7f8c8d;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>ỨNG DỤNG NHẬN DIỆN CẢM XÚC KHUÔN MẶT</h2>
+
+  <div class="wrapper">
+    <video id="video" autoplay playsinline muted width="640" height="480"></video>
+    <canvas id="overlay" width="640" height="480"></canvas>
+  </div>
+
+  <div id="status">Đang yêu cầu quyền mở Camera...</div>
+  <div id="log">Khởi tạo hệ thống...</div>
+
+  <script>
+    const video = document.getElementById('video');
+    const overlay = document.getElementById('overlay');
+    const ctx = overlay.getContext('2d');
+    const statusDiv = document.getElementById('status');
+    const logDiv = document.getElementById('log');
+
+    // Canvas ẩn dùng để trích xuất ảnh frame gửi lên server
+    const sendCanvas = document.createElement('canvas');
+    sendCanvas.width = 640;
+    sendCanvas.height = 480;
+    const sendCtx = sendCanvas.getContext('2d');
+
+    // 1. Xin quyền Camera
+    navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
+      .then(stream => {
+        video.srcObject = stream;
+        statusDiv.innerText = "Camera sẵn sàng. Bắt đầu nhận diện...";
+        startLoop();
+      })
+      .catch(err => {
+        statusDiv.innerText = "Lỗi Camera: " + err.message;
+        console.error("Camera Error:", err);
+      });
+
+    let sending = false;
+    let frameCount = 0;
+
+    // 2. Vòng lặp gửi frame lên Flask
+    function startLoop() {
+      setInterval(async () => {
+        if (sending || video.readyState < 2) return;
+        sending = true;
+
+        // Chụp frame từ thẻ video sang canvas ẩn
+        sendCtx.drawImage(video, 0, 0, 640, 480);
+        const base64Data = sendCanvas.toDataURL('image/jpeg', 0.6);
+
+        try {
+          const response = await fetch('/predict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: base64Data })
+          });
+
+          if (!response.ok) {
+            throw new Error(`Mã lỗi HTTP: ${response.status}`);
+          }
+
+          const resData = await response.json();
+          frameCount++;
+          logDiv.innerText = `Đã gửi: ${frameCount} frame | Tìm thấy: ${resData.faces ? resData.faces.length : 0} khuôn mặt`;
+          drawBoxes(resData.faces || []);
+        } catch (error) {
+          logDiv.innerText = "Lỗi gửi frame: " + error.message;
+          console.error("Fetch Error:", error);
+        } finally {
+          sending = false;
+        }
+      }, 150); // Gửi mỗi 150ms
+    }
+
+    // 3. Vẽ Bounding Box và Nhãn
+    function drawBoxes(faces) {
+      ctx.clearRect(0, 0, 640, 480);
+
+      faces.forEach(item => {
+        const { x, y, w, h } = item.box;
+
+        // Vẽ viền chữ nhật xanh
+        ctx.strokeStyle = '#00FF00';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x, y, w, h);
+
+        // Vẽ khung nền chữ
+        const text = `${item.emotion} (${item.confidence}%)`;
+        ctx.font = 'bold 16px Arial';
+        const txtWidth = ctx.measureText(text).width;
+
+        ctx.fillStyle = '#00FF00';
+        const textY = y > 25 ? y - 25 : y;
+        ctx.fillRect(x, textY, txtWidth + 10, 24);
+
+        // Vẽ chữ màu đen nổi trên nền xanh
+        ctx.fillStyle = '#000000';
+        ctx.fillText(text, x + 5, textY + 17);
+      });
+    }
+  </script>
+</body>
+</html>

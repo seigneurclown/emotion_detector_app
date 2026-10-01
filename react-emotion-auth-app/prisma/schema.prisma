@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(uuid())
+  email        String       @unique
+  password     String
+  name         String?
+  refreshToken String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  emotionLogs  EmotionLog[]
+}
+
+model EmotionLog {
+  id              String   @id @default(uuid())
+  userId          String
+  detectedEmotion String   // e.g., "Happy", "Neutral", "Sad", "Surprised", "Angry"
+  confidenceScore Float    // e.g., 0.94 (94%)
+  snapshotUrl     String?  // Optional snapshot URL
+  createdAt       DateTime @default(now())
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}

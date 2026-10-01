@@ -1,0 +1,16 @@
+{
+  "name": "emotion-detector-app",
+  "version": "1.0.0",
+  "description": "Facial Emotion Recognition with React, Express, MongoDB, and PyTorch",
+  "scripts": {
+    "dev": "npm --prefix react-emotion-auth-app run dev",
+    "start": "npm --prefix react-emotion-auth-app run dev",
+    "client": "npm --prefix react-emotion-auth-app run client",
+    "server": "npm --prefix react-emotion-auth-app run server",
+    "build": "npm --prefix react-emotion-auth-app run build",
+    "ai": ".\\.venv\\Scripts\\python app.py"
+  },
+  "devDependencies": {
+    "@pipyl/antigravity-workflows": "^1.0.6"
+  }
+}
